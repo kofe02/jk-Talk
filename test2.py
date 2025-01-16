@@ -10,7 +10,9 @@ from pathlib import Path
 import wave
 import simpleaudio as sa
 from faster_whisper import WhisperModel
+import serial
 
+ser = serial.Serial('COM9', 9600, timeout=1)
 model = WhisperModel("kotoba-tech/kotoba-whisper-v2.0-faster")
 CHUNK = 2**10
 FORMAT = pyaudio.paInt16
@@ -32,6 +34,8 @@ core = VoicevoxCore(open_jtalk_dict_dir=open_jtalk_dict_dir)
 is_start = False  # 測定開始フラグ
 is_end = False  # 測定終了フラグ
 is_saved = False  # 音声ファイル保存フラグ
+is_exit = False
+line = ""
 
 if not core.is_model_loaded(SPREAKER_ID):
     core.load_model(SPREAKER_ID)
@@ -121,21 +125,27 @@ def sampling_voice():
 
 
 def detect_key():
-    global is_start, is_end
+    global is_start, is_end, is_exit, line, ser
     while True:
-        c = readchar.readkey()
-        if c == "s":
+        c=""
+        # c = readchar.readkey()
+        if c == "s" or line=="s":
             is_start = True
             print("Start!")
-        if c == "q":
+        if c == "q"or line=="q":
             is_end = True
             print("End!")
+        if c== "e":
+            is_exit = True
 
 
 def main():
-    global is_start, is_end, is_saved
+    global is_start, is_end, is_saved, is_exit,line,ser
     messages = []
-    while True:
+    while not is_exit:
+        line = ser.readline().decode('utf-8').strip()
+        if line:
+            print(line)
         if is_saved == False:
             continue
         is_start = False
@@ -147,7 +157,7 @@ def main():
             chunk_length=15,
             condition_on_previous_text=False,
         )
-        user_input = "30字以内で答えてください。"
+        user_input = "以下はあなたが演じる人間の特性です。「博物館に来ています。生き物に興味があります。生き物に対する知識は一般人程度です。対話者との関係は友達です。」これらの性格を持つ人間として会話してください。会話が続くように質問なども適宜行ってください。"
         for segment in segments:
             user_input += segment.text
         print(user_input)
@@ -158,6 +168,8 @@ def main():
         print("\n\n")
         print(messages)
         time.sleep(0.1)
+    if is_exit==True:
+        ser.close()
 
 
 if __name__ == "__main__":
@@ -175,4 +187,3 @@ if __name__ == "__main__":
     thread3.start()
 
     main()
-
